@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DriveSafe — Anti-Sleep Alarm System</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+/* ── DESIGN TOKENS ── */
+:root {
+  --bg:                    #0e0e0e;
+  --surface:               #131313;
+  --surface-low:           #1c1b1b;
+  --surface-container:     #201f1f;
+  --surface-high:          #2a2a2a;
+  --surface-highest:       #353534;
+  --outline:               #514532;
+  --on-surface:            #e5e2e1;
+  --on-surface-dim:        rgba(229,226,225,0.4);
+  --primary:               #FFB300;
+  --primary-dim:           #ffba38;
+  --primary-glow:          rgba(255,179,0,0.25);
+  --secondary:             #00E3FD;
+  --secondary-glow:        rgba(0,227,253,0.2);
+  --danger:                #FF1744;
+  --danger-glow:           rgba(255,23,68,0.25);
+  --danger-container:      #93000a;
+  --font-hud:              'Rajdhani', sans-serif;
+  --font-body:             'Inter', sans-serif;
+  --font-mono:             'Space Mono', monospace;
+  --r:                     12px;
+  --r-lg:                  16px;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── CARBON TEXTURE BASE ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(#2a2a2a 0.5px, transparent 0.5px);
+  background-size: 4px 4px;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at top right, rgba(255,179,0,0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SCANLINE EFFECT ── */
+.hud-scanline {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(255,179,0,0.03) 3px,
+    rgba(255,179,0,0.03) 4px
+  );
+}
+
+/* ── TOP HEADER ── */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(14,14,14,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,179,0,0.08);
+  box-shadow: 0 4px 30px rgba(255,179,0,0.04);
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--primary-glow);
+  animation: logo-pulse 3s ease-in-out infinite;
+}
+
+@keyframes logo-pulse {
+  0%, 100% { box-shadow: 0 0 20px var(--primary-glow); }
+  50%       { box-shadow: 0 0 35px rgba(255,179,0,0.4); }
+}
+
+.logo-icon svg { width: 22px; height: 22px; fill: #0e0e0e; }
+
+.logo-text {
+  font-family: var(--font-hud);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.2em;
+  color: var(--on-surface);
+  text-transform: uppercase;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.monitoring-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 99px;
+  background: var(--surface-container);
+  border: 1px solid rgba(0,227,253,0.15);
+}
+
+.monitoring-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--secondary);
+  box-shadow: 0 0 8px var(--secondary);
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.monitoring-text {
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  text-transform: uppercase;
+}
+
+#liveClock {
+  font-family: var(--font-hud);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(229,226,225,0.7);
+}
+
+/* ── SIDE NAV ── */
+.sidenav {
+  position: fixed;
+  left: 0;
+  top: 64px;
+  bottom: 0;
+  width: 72px;
+  z-index: 50;
+  background: rgba(32,31,31,0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(229,226,225,0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  gap: 4px;
+}
+
+.nav-item {
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgba(229,226,225,0.35);
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  color: var(--primary);
+  background: rgba(255,179,0,0.06);
+}
+
+.nav-item.active {
+  background: var(--primary);
+  color: #0e0e0e;
+  box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.nav-item .material-symbols-outlined { font-size: 22px; }
+.nav-label { font-family: var(--font-body); font-size: 9px; font-weight: 500; }
+
+.nav-emergency {
+  margin-top: auto;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r);
+  background: rgba(147,0,10,0.25);
+  border: 1px solid rgba(255,23,68,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--danger);
+}
+
+.nav-emergency:hover {
+  background: var(--danger-container);
+  box-shadow: 0 0 20px var(--danger-glow);
+}
+
+/* ── MAIN LAYOUT ── */
+main {
+  padding-top: 80px;
+  padding-bottom: 32px;
+  padding-left: 88px;
+  padding-right: 24px;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── LEFT COLUMN ── */
+.left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── CAMERA HUD PANEL ── */
+.cam-panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255,179,0,0.08);
+  box-shadow: 0 0 60px rgba(0,227,253,0.05);
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+
+.cam-panel.state-open {
+  border-color: rgba(0,227,253,0.35);
+  box-shadow: 0 0 60px rgba(0,227,253,0.12), inset 0 0 40px rgba(0,227,253,0.04);
+}
+
+.cam-panel.state-alarm {
+  border-color: rgba(255,23,68,0.5);
+  box-shadow: 0 0 60px rgba(255,23,68,0.2), inset 0 0 60px rgba(255,23,68,0.08);
+  animation: alarm-border-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes alarm-border-pulse {
+  0%, 100% { box-shadow: 0 0 60px rgba(255,23,68,0.2), inset 0 0 60px rgba(255,23,68,0.08); }
+  50%       { box-shadow: 0 0 100px rgba(255,23,68,0.4), inset 0 0 80px rgba(255,23,68,0.14); }
+}
+
+#video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1);
+}
+
+#canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
+/* Scanline overlay */
+.cam-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(255,179,0,0.025) 3px,
+    rgba(255,179,0,0.025) 4px
+  );
+  z-index: 3;
+}
+
+/* HUD corner brackets */
+.cam-corner {
+  position: absolute;
+  width: 28px; height: 28px;
+  z-index: 4;
+  pointer-events: none;
+}
+.cam-corner.tl { top: 16px; left: 16px; border-top: 2px solid var(--primary); border-left: 2px solid var(--primary); border-radius: 4px 0 0 0; }
+.cam-corner.tr { top: 16px; right: 16px; border-top: 2px solid var(--primary); border-right: 2px solid var(--primary); border-radius: 0 4px 0 0; }
+.cam-corner.bl { bottom: 16px; left: 16px; border-bottom: 2px solid var(--primary); border-left: 2px solid var(--primary); border-radius: 0 0 0 4px; }
+.cam-corner.br { bottom: 16px; right: 16px; border-bottom: 2px solid var(--primary); border-right: 2px solid var(--primary); border-radius: 0 0 4px 0; }
+
+/* Live badge */
+.live-badge {
+  position: absolute;
+  top: 16px; left: 52px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(14,14,14,0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 99px;
+  border: 1px solid rgba(229,226,225,0.1);
+}
+
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--secondary);
+  box-shadow: 0 0 6px var(--secondary);
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+#camLabel {
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(229,226,225,0.6);
+  text-transform: uppercase;
+}
+
+/* Steering wheel overlay */
+.steering-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52%;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.22;
+  filter: drop-shadow(0 -10px 30px rgba(255,179,0,0.15));
+}
+
+.steering-wrap svg { width: 100%; height: auto; display: block; }
+
+/* Big status badge */
+#bigStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 28px;
+  border-radius: 99px;
+  background: rgba(14,14,14,0.75);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(0,227,253,0.3);
+  font-family: var(--font-hud);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s;
+  white-space: nowrap;
+  box-shadow: 0 0 20px rgba(0,227,253,0.12);
+  align-self: center;
+}
+
+#bigStatus.show { opacity: 1; }
+
+#bigStatus.alarm-state {
+  color: var(--danger);
+  border-color: rgba(255,23,68,0.5);
+  box-shadow: 0 0 30px rgba(255,23,68,0.3);
+  animation: status-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 30px rgba(255,23,68,0.3); }
+  50%       { box-shadow: 0 0 60px rgba(255,23,68,0.6); }
+}
+
+/* ── METRICS ROW ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.metric-card {
+  background: var(--surface-container);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  border: 1px solid rgba(81,69,50,0.3);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top left, rgba(255,179,0,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.card-label {
+  font-family: var(--font-hud);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--on-surface-dim);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* EAR Card */
+.ear-value {
+  font-family: var(--font-hud);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  transition: color 0.3s;
+}
+
+.ear-value.danger { color: var(--danger); }
+
+.ear-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-highest);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.ear-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--primary), var(--secondary));
+  box-shadow: 0 0 12px rgba(255,179,0,0.4);
+  transition: width 0.1s, background 0.25s, box-shadow 0.25s;
+}
+
+.ear-bar-fill.danger {
+  background: linear-gradient(to right, #ff6b35, var(--danger));
+  box-shadow: 0 0 12px rgba(255,23,68,0.5);
+}
+
+.ear-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--font-hud);
+  font-size: 0.58rem;
+  color: var(--on-surface-dim);
+  letter-spacing: 0.1em;
+}
+
+/* Diagnostics Card */
+.diag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.diag-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diag-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--surface-highest);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.diag-dot.cyan  { background: var(--secondary); box-shadow: 0 0 8px var(--secondary); }
+.diag-dot.amber { background: var(--primary);   box-shadow: 0 0 8px var(--primary); }
+.diag-dot.red   { background: var(--danger);    box-shadow: 0 0 8px var(--danger); animation: diag-alarm 0.5s ease-in-out infinite; }
+
+@keyframes diag-alarm {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.diag-name {
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--on-surface);
+}
+
+.diag-val {
+  font-family: var(--font-hud);
+  font-size: 0.6rem;
+  color: var(--on-surface-dim);
+  letter-spacing: 0.05em;
+  display: block;
+}
+
+/* ── RIGHT COLUMN ── */
+.right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── MISSION LOG ── */
+.log-card {
+  background: var(--surface-container);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(81,69,50,0.3);
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(81,69,50,0.2);
+}
+
+.card-header-title {
+  font-family: var(--font-hud);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--on-surface-dim);
+  text-transform: uppercase;
+}
+
+.card-header .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--on-surface-dim);
+}
+
+#logContainer {
+  padding: 12px 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-highest) transparent;
+}
+
+.log-entry {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1.7;
+  display: flex;
+  gap: 10px;
+  color: rgba(229,226,225,0.45);
+  animation: log-in 0.2s ease;
+}
+
+@keyframes log-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.log-ts { opacity: 0.5; flex-shrink: 0; }
+.log-entry.ok   { color: var(--secondary); }
+.log-entry.err  { color: var(--danger); }
+.log-entry.warn { color: var(--primary); }
+
+/* ── CONTROLS CARD ── */
+.ctrl-card {
+  background: var(--surface-container);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(81,69,50,0.3);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ctrl-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  border: 1px solid rgba(0,227,253,0.25);
+  background: transparent;
+  color: var(--secondary);
+  font-family: var(--font-hud);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+  background: rgba(0,227,253,0.08);
+  border-color: var(--secondary);
+  box-shadow: 0 0 20px rgba(0,227,253,0.12);
+}
+
+.btn-ghost.active {
+  background: rgba(0,227,253,0.12);
+  border-color: var(--secondary);
+  box-shadow: 0 0 20px rgba(0,227,253,0.2);
+}
+
+.btn-ghost.amber-ghost {
+  border-color: rgba(255,179,0,0.25);
+  color: var(--primary);
+}
+
+.btn-ghost.amber-ghost:hover {
+  background: rgba(255,179,0,0.08);
+  border-color: var(--primary);
+  box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.btn-ghost.amber-ghost.active {
+  background: rgba(255,179,0,0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 20px rgba(255,179,0,0.25);
+}
+
+.btn-ghost .material-symbols-outlined { font-size: 16px; }
+
+/* CTA button */
+#btnStart {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--primary);
+  color: #0e0e0e;
+  border: none;
+  font-family: var(--font-hud);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 0 30px rgba(255,179,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+#btnStart::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.5s;
+}
+
+#btnStart:hover::before { transform: translateX(100%); }
+#btnStart:hover { filter: brightness(1.1); box-shadow: 0 0 50px rgba(255,179,0,0.35); }
+#btnStart:active { transform: scale(0.98); }
+
+#btnStart.running {
+  background: var(--danger);
+  box-shadow: 0 0 30px rgba(255,23,68,0.3);
+}
+
+#btnStart:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+#btnStart:disabled::before { display: none; }
+
+/* ── SLIDERS ── */
+.slider-group { display: flex; flex-direction: column; gap: 14px; }
+
+.slider-row { display: flex; flex-direction: column; gap: 6px; }
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slider-label {
+  font-family: var(--font-hud);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--on-surface-dim);
+  text-transform: uppercase;
+}
+
+.slider-val {
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+input[type=range] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--surface-highest);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 18px rgba(255,179,0,0.5);
+  transform: scale(1.2);
+}
+
+/* ── MOTOR/BUZZER ROW ── */
+.device-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.device-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-low);
+  border-radius: var(--r);
+  border: 1px solid rgba(81,69,50,0.2);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.device-chip.active-green {
+  border-color: rgba(0,227,253,0.3);
+  box-shadow: 0 0 16px rgba(0,227,253,0.1);
+}
+
+.device-chip.active-red {
+  border-color: rgba(255,23,68,0.3);
+  box-shadow: 0 0 16px rgba(255,23,68,0.15);
+  animation: chip-alarm 0.5s ease-in-out infinite;
+}
+
+@keyframes chip-alarm {
+  0%, 100% { box-shadow: 0 0 16px rgba(255,23,68,0.15); }
+  50%       { box-shadow: 0 0 30px rgba(255,23,68,0.35); }
+}
+
+.device-led {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--surface-highest);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.device-led.on-green { background: var(--secondary); box-shadow: 0 0 8px var(--secondary); }
+.device-led.on-red   { background: var(--danger);    box-shadow: 0 0 8px var(--danger); }
+
+.device-info { display: flex; flex-direction: column; }
+
+.device-name {
+  font-family: var(--font-hud);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--on-surface-dim);
+  text-transform: uppercase;
+}
+
+.device-status {
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(229,226,225,0.5);
+  transition: color 0.2s;
+}
+
+.device-status.on  { color: var(--secondary); }
+.device-status.off { color: var(--danger); }
+.device-status.alarm { color: var(--danger); }
+
+/* ── ESP WiFi CONNECT PANEL ── */
+.esp-panel {
+  background: var(--surface-low);
+  border-radius: var(--r);
+  border: 1px solid rgba(255,179,0,0.15);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.esp-panel-label {
+  font-family: var(--font-hud);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--primary);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.esp-panel-label .material-symbols-outlined { font-size: 14px; }
+
+.esp-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#espIpInput {
+  flex: 1;
+  background: var(--surface-container);
+  border: 1px solid rgba(255,179,0,0.2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--on-surface);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#espIpInput::placeholder { color: rgba(229,226,225,0.25); }
+
+#espIpInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 12px rgba(255,179,0,0.15);
+}
+
+#btnWifi {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,179,0,0.3);
+  background: rgba(255,179,0,0.08);
+  color: var(--primary);
+  font-family: var(--font-hud);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+#btnWifi:hover {
+  background: rgba(255,179,0,0.16);
+  box-shadow: 0 0 16px var(--primary-glow);
+}
+
+#btnWifi.active {
+  background: rgba(255,179,0,0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.esp-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#espStatusDot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--surface-highest);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+#espStatusDot.connected { background: var(--primary); box-shadow: 0 0 8px var(--primary-glow); }
+#espStatusDot.error     { background: var(--danger);  box-shadow: 0 0 8px var(--danger-glow); }
+
+#espStatusText {
+  font-family: var(--font-hud);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--on-surface-dim);
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  padding: 24px;
+  padding-left: 96px;
+  opacity: 0.3;
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  color: rgba(229,226,225,0.4);
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── ALARM PAGE FLASH ── */
+.alarm-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  border: 0px solid var(--danger);
+  transition: border-width 0.1s;
+}
+
+.alarm-flash.active {
+  border-width: 4px;
+  animation: page-flash 0.5s ease-in-out infinite;
+}
+
+@keyframes page-flash {
+  0%, 100% { border-color: rgba(255,23,68,0.4); box-shadow: inset 0 0 80px rgba(255,23,68,0.06); }
+  50%       { border-color: rgba(255,23,68,0.8); box-shadow: inset 0 0 100px rgba(255,23,68,0.12); }
+}
+
+/* ── MATERIAL SYMBOLS ── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-family: 'Material Symbols Outlined';
+}
+
+/* ── MOBILE ── */
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .sidenav { display: none; }
+
+  .metrics-row { grid-template-columns: 1fr; }
+}
+
+/* ── ENTRANCE ANIMATIONS ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.left-col  { animation: fade-up 0.5s ease 0.1s both; }
+.right-col { animation: fade-up 0.5s ease 0.2s both; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-highest); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ── ALARM FLASH RING ── -->
+<div class="alarm-flash" id="alarmFlash"></div>
+
+<!-- ── HEADER ── -->
+<header>
+  <a class="header-logo" href="#">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c4.41 0 8 3.59 8 8 0 1.28-.31 2.48-.85 3.55L13 12.17V4.07c-.33-.05-.66-.07-1-.07zm-2 .07v8.1l-6.15 3.38C3.31 14.48 3 13.28 3 12c0-4.07 2.97-7.47 6.84-8.16L10 4.07zM4.32 17.15L11 13.42V19.9c-2.89-.49-5.28-2.37-6.68-4.75zm8.68 2.75v-6.48l6.68 3.73C18.27 19.38 15.3 20 12 20z"/>
+      </svg>
+    </div>
+    <span class="logo-text">DriveSafe</span>
+  </a>
+
+  <div class="header-center">
+    <div class="monitoring-badge">
+      <div class="monitoring-dot"></div>
+      <span class="monitoring-text">Monitoring Active</span>
+    </div>
+    <span id="liveClock">00:00:00</span>
+  </div>
+</header>
+
+<!-- ── SIDE NAV ── -->
+<nav class="sidenav">
+  <div class="nav-item active">
+    <span class="material-symbols-outlined">speed</span>
+    <span class="nav-label">Dashboard</span>
+  </div>
+  <div class="nav-item">
+    <span class="material-symbols-outlined">analytics</span>
+    <span class="nav-label">Telemetry</span>
+  </div>
+  <div class="nav-item">
+    <span class="material-symbols-outlined">tune</span>
+    <span class="nav-label">Calibrate</span>
+  </div>
+  <div class="nav-item">
+    <span class="material-symbols-outlined">settings</span>
+    <span class="nav-label">Settings</span>
+  </div>
+  <div class="nav-emergency" title="Emergency Stop">
+    <span class="material-symbols-outlined" style="font-size:22px;">emergency_home</span>
+  </div>
+</nav>
+
+<!-- ── MAIN CONTENT ── -->
+<main>
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+
+    <!-- Camera HUD -->
+    <div class="cam-panel" id="camPanel">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+
+      <!-- Scanlines -->
+      <div class="cam-scanlines"></div>
+
+      <!-- Corner brackets -->
+      <div class="cam-corner tl"></div>
+      <div class="cam-corner tr"></div>
+      <div class="cam-corner bl"></div>
+      <div class="cam-corner br"></div>
+
+      <!-- Live badge -->
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span id="camLabel">STANDBY</span>
+      </div>
+    </div>
+
+    <!-- Status badge (below cam) -->
+    <div id="bigStatus">
+      <span id="statusIcon">👁</span>
+      <span id="statusText">EYES OPEN</span>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="metrics-row">
+
+      <!-- EAR Card -->
+      <div class="metric-card">
+        <div class="card-label">
+          <span>Eye Openness Ratio</span>
+          <span style="color:var(--primary);font-size:0.65rem;" id="earNum">0.000</span>
+        </div>
+        <div class="ear-value" id="earDisplay">0.000</div>
+        <div class="ear-bar-track">
+          <div class="ear-bar-fill" id="earFill"></div>
+        </div>
+        <div class="ear-bar-labels">
+          <span>0.00 CLOSED</span>
+          <span id="threshLabel">CRITICAL: 0.21</span>
+          <span>1.00 WIDE</span>
+        </div>
+      </div>
+
+      <!-- Diagnostics Card -->
+      <div class="metric-card">
+        <div class="card-label">Diagnostics</div>
+        <div class="diag-grid">
+          <div class="diag-item">
+            <div class="diag-dot" id="dotCam"></div>
+            <div>
+              <div class="diag-name">CAMERA</div>
+              <span class="diag-val" id="valCam">OFFLINE</span>
+            </div>
+          </div>
+          <div class="diag-item">
+            <div class="diag-dot" id="dotDetect"></div>
+            <div>
+              <div class="diag-name">FACE</div>
+              <span class="diag-val" id="valDetect">—</span>
+            </div>
+          </div>
+          <div class="diag-item">
+            <div class="diag-dot" id="dotEye"></div>
+            <div>
+              <div class="diag-name">EYE STATE</div>
+              <span class="diag-val" id="valEye">—</span>
+            </div>
+          </div>
+          <div class="diag-item">
+            <div class="diag-dot" id="dotSerial"></div>
+            <div>
+              <div class="diag-name">ARDUINO</div>
+              <span class="diag-val" id="valSerial">NOT LINKED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Motor / Buzzer -->
+        <div class="device-row" style="margin-top:16px;">
+          <div class="device-chip" id="motorChip">
+            <div class="device-led" id="ledMotor"></div>
+            <div class="device-info">
+              <span class="device-name">Motor</span>
+              <span class="device-status" id="valMotor">—</span>
+            </div>
+          </div>
+          <div class="device-chip" id="buzzerChip">
+            <div class="device-led" id="ledBuzzer"></div>
+            <div class="device-info">
+              <span class="device-name">Buzzer</span>
+              <span class="device-status" id="valBuzzer">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+
+    <!-- Mission Log -->
+    <div class="log-card">
+      <div class="card-header">
+        <span class="card-header-title">Mission Log</span>
+        <span class="material-symbols-outlined">history</span>
+      </div>
+      <div id="logContainer"></div>
+    </div>
+
+    <!-- Tactical Controls -->
+    <div class="ctrl-card">
+      <div class="card-label">Tactical Controls</div>
+
+      <!-- ── ESP WiFi Connect Panel ── -->
+      <div class="esp-panel">
+        <div class="esp-panel-label">
+          <span class="material-symbols-outlined">wifi</span>
+          ESP8266 WiFi Link
+        </div>
+        <div class="esp-input-row">
+          <span id="espIpDisplay" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--primary);padding:8px 12px;background:var(--surface-low);border-radius:8px;border:1px solid rgba(255,179,0,0.2);flex:1;">172.26.241.129</span>
+          <button id="btnWifi">Connect</button>
+        </div>
+        <div class="esp-status-row">
+          <div id="espStatusDot"></div>
+          <span id="espStatusText">Connecting to ESP...</span>
+        </div>
+      </div>
+
+      <!-- Camera + Serial (USB fallback) buttons -->
+      <div class="ctrl-btn-row">
+        <button class="btn-ghost" id="btnCam">
+          <span class="material-symbols-outlined">videocam</span>
+          Enable Camera
+        </button>
+        <!-- Serial kept as optional USB fallback -->
+        <button class="btn-ghost amber-ghost" id="btnSerial">
+          <span class="material-symbols-outlined">usb</span>
+          USB Fallback
+        </button>
+      </div>
+
+      <!-- Begin Detection -->
+      <button id="btnStart" disabled>◉ Begin Detection</button>
+
+      <!-- Sliders -->
+      <div class="slider-group">
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-label">EAR Threshold</span>
+            <span class="slider-val" id="earThreshVal">0.21</span>
+          </div>
+          <input type="range" id="earThresh" min="0.1" max="0.4" step="0.01" value="0.21"/>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-label">Closed Duration</span>
+            <span class="slider-val" id="closeFramesVal">0.2s</span>
+          </div>
+          <input type="range" id="closeFrames" min="0" max="10" step="0.1" value="0.2"/>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-label">No-Face Delay (s)</span>
+            <span class="slider-val" id="noFaceDelayVal">3</span>
+          </div>
+          <input type="range" id="noFaceDelay" min="1" max="10" step="1" value="3"/>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ── FOOTER ── -->
+<footer>
+  Keep eyes on the road. This system is a safety aid, not a replacement for rest. &nbsp;·&nbsp; © 2025 DriveSafe HUD
+</footer>
+
+<!-- ── MEDIAPIPE ── -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+<script>
+// ── DOM refs ──────────────────────────────────────────────────
+const video       = document.getElementById('video');
+const canvas      = document.getElementById('canvas');
+const ctx         = canvas.getContext('2d');
+const camPanel    = document.getElementById('camPanel');
+const camLabel    = document.getElementById('camLabel');
+const bigStatus   = document.getElementById('bigStatus');
+const statusText  = document.getElementById('statusText');
+const statusIcon  = document.getElementById('statusIcon');
+const btnCam      = document.getElementById('btnCam');
+const btnSerial   = document.getElementById('btnSerial');
+const btnStart    = document.getElementById('btnStart');
+const logCont     = document.getElementById('logContainer');
+const earFill     = document.getElementById('earFill');
+const earNum      = document.getElementById('earNum');
+const earDisplay  = document.getElementById('earDisplay');
+const alarmFlash  = document.getElementById('alarmFlash');
+
+const earThreshIn   = document.getElementById('earThresh');
+const closeFramesIn = document.getElementById('closeFrames');
+const noFaceDelayIn = document.getElementById('noFaceDelay');
+
+// ── ESP WiFi refs ─────────────────────────────────────────────
+const HARDCODED_IP = '172.26.241.129';   // Fixed ESP IP — never changes
+const btnWifi      = document.getElementById('btnWifi');
+const espStatusDot = document.getElementById('espStatusDot');
+const espStatusTxt = document.getElementById('espStatusText');
+
+// ── Dot / Val helpers ─────────────────────────────────────────
+const D = k => document.getElementById('dot' + k);
+const V = k => document.getElementById('val' + k);
+
+// ── Slider live values ────────────────────────────────────────
+earThreshIn.oninput = e => {
+  document.getElementById('earThreshVal').textContent = parseFloat(e.target.value).toFixed(2);
+  document.getElementById('threshLabel').textContent  = 'CRITICAL: ' + parseFloat(e.target.value).toFixed(2);
+};
+closeFramesIn.oninput = e => { document.getElementById('closeFramesVal').textContent = parseFloat(e.target.value).toFixed(1) + 's'; };
+noFaceDelayIn.oninput = e => { document.getElementById('noFaceDelayVal').textContent = e.target.value + 's'; };
+
+// ── Live Clock ────────────────────────────────────────────────
+function updateClock() {
+  const n = new Date();
+  document.getElementById('liveClock').textContent =
+    n.toTimeString().slice(0, 8);
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ── State ─────────────────────────────────────────────────────
+let camReady      = false;
+let serialPort    = null;
+let serialWriter  = null;
+let detecting     = false;
+let closedCount   = 0;
+let lastSent      = null;
+let noFaceTimer   = null;
+let faceMeshReady = false;
+
+// ── ESP WiFi State ────────────────────────────────────────────
+let espIp        = HARDCODED_IP;   // Always use the fixed IP
+let espConnected = false;          // true after successful /status ping
+
+// ── Logger ────────────────────────────────────────────────────
+function log(msg, type = '') {
+  const d = document.createElement('div');
+  d.className = 'log-entry ' + type;
+  const ts = new Date().toTimeString().slice(0, 8);
+  d.innerHTML = `<span class="log-ts">[${ts}]</span><span>${msg}</span>`;
+  logCont.prepend(d);
+  if (logCont.children.length > 60) logCont.lastChild.remove();
+}
+
+// ── EAR calculation ───────────────────────────────────────────
+const LEFT_EYE  = [33, 160, 158, 133, 153, 144];
+const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
+
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function eyeAspectRatio(landmarks, indices) {
+  const p = indices.map(i => landmarks[i]);
+  return (dist(p[1], p[5]) + dist(p[2], p[4])) / (2.0 * dist(p[0], p[3]));
+}
+
+// ── WiFi ESP fetch ────────────────────────────────────────────
+// Primary communication path when on same local network as ESP.
+// Uses a fire-and-forget approach with a short timeout so a
+// temporarily unreachable ESP never blocks the detection loop.
+async function sendWifi(path) {
+  if (!espConnected || !espIp) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500); // 1.5 s timeout
+    await fetch(`http://${espIp}${path}`, { signal: controller.signal });
+    clearTimeout(timeout);
+  } catch (e) {
+    // Silently swallow — network hiccup shouldn't crash detection
+    if (e.name !== 'AbortError') log('WiFi send error: ' + e.message, 'err');
+  }
+}
+
+// ── Serial (USB fallback) ─────────────────────────────────────
+// Only used when WiFi is not connected and USB cable is plugged in.
+async function sendSerial(char) {
+  if (!serialWriter) return;
+  try { await serialWriter.write(new TextEncoder().encode(char)); }
+  catch (e) { log('Serial write error: ' + e.message, 'err'); }
+}
+
+// ── Unified send: WiFi first, Serial as fallback ──────────────
+function sendCommand(eyesOpen) {
+  const sig = eyesOpen ? '1' : '0';
+  if (sig === lastSent) return;   // deduplicate — no change
+  lastSent = sig;
+
+  if (espConnected) {
+    sendWifi(eyesOpen ? '/on' : '/off');
+  } else {
+    sendSerial(sig);
+  }
+}
+
+// ── Update UI chips/LEDs for motor & buzzer ───────────────────
+function setMotorBuzzer(eyesOpen) {
+  sendCommand(eyesOpen);
+
+  const motorChip  = document.getElementById('motorChip');
+  const buzzerChip = document.getElementById('buzzerChip');
+  const ledMotor   = document.getElementById('ledMotor');
+  const ledBuzzer  = document.getElementById('ledBuzzer');
+
+  if (eyesOpen) {
+    motorChip.className  = 'device-chip active-green';
+    buzzerChip.className = 'device-chip';
+    ledMotor.className   = 'device-led on-green';
+    ledBuzzer.className  = 'device-led';
+    V('Motor').textContent  = 'RUNNING';
+    V('Motor').className    = 'device-status on';
+    V('Buzzer').textContent = 'OFF';
+    V('Buzzer').className   = 'device-status';
+    log('Eyes OPEN → Motor ON, Buzzer OFF', 'ok');
+  } else {
+    motorChip.className  = 'device-chip';
+    buzzerChip.className = 'device-chip active-red';
+    ledMotor.className   = 'device-led';
+    ledBuzzer.className  = 'device-led on-red';
+    V('Motor').textContent  = 'STOPPED';
+    V('Motor').className    = 'device-status';
+    V('Buzzer').textContent = 'ALARM!';
+    V('Buzzer').className   = 'device-status alarm';
+    log('Eyes CLOSED → Motor OFF, Buzzer ALARM', 'err');
+  }
+}
+
+// ── ESP WiFi Connect / Disconnect ────────────────────────────
+async function connectToEsp() {
+  espStatusTxt.textContent = 'Pinging ESP...';
+  espStatusDot.className   = '';
+  btnWifi.textContent      = 'Connecting...';
+  btnWifi.disabled         = true;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`http://${HARDCODED_IP}/status`, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      espConnected = true;
+
+      espStatusDot.className   = 'connected';
+      espStatusTxt.textContent = `Connected — ${HARDCODED_IP}`;
+      btnWifi.textContent      = '✗ Disconnect';
+      btnWifi.classList.add('active');
+
+      D('Serial').className    = 'diag-dot cyan';
+      V('Serial').textContent  = 'WIFI LINKED';
+
+      log(`ESP linked via WiFi at ${HARDCODED_IP}`, 'ok');
+      log('Ready — press Begin Detection to start motor & monitoring', 'warn');
+      checkReady();
+    } else {
+      throw new Error('Bad response: ' + res.status);
+    }
+  } catch (e) {
+    espConnected = false;
+    espStatusDot.className   = 'error';
+    espStatusTxt.textContent = 'Failed — check IP & same network';
+    btnWifi.textContent      = 'Retry';
+    log('WiFi connect failed: ' + (e.name === 'AbortError' ? 'timeout' : e.message), 'err');
+  }
+
+  btnWifi.disabled = false;
+}
+
+async function disconnectFromEsp() {
+  // Turn motor and buzzer OFF before disconnecting
+  await sendWifi('/stop');
+  espConnected = false;
+
+  espStatusDot.className   = '';
+  espStatusTxt.textContent = 'Disconnected';
+  btnWifi.textContent      = 'Connect';
+  btnWifi.classList.remove('active');
+
+  D('Serial').className    = 'diag-dot';
+  V('Serial').textContent  = 'NOT LINKED';
+
+  // Stop detection if running
+  if (detecting) {
+    detecting = false;
+    if (mpCamera) { mpCamera.stop(); mpCamera = null; }
+    btnStart.textContent = '◉ Begin Detection';
+    btnStart.classList.remove('running');
+    camPanel.className   = 'cam-panel';
+    bigStatus.className  = 'big-status';
+    alarmFlash.className = 'alarm-flash';
+  }
+
+  log('ESP disconnected — motor OFF', 'warn');
+  checkReady();
+}
+
+btnWifi.addEventListener('click', () => {
+  if (espConnected) {
+    disconnectFromEsp();
+  } else {
+    connectToEsp();
+  }
+});
+
+// Auto-connect on page load
+window.addEventListener('load', () => {
+  connectToEsp();
+});
+
+// ── FaceMesh ──────────────────────────────────────────────────
+const faceMesh = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+
+faceMesh.onResults(results => {
+  if (!detecting) return;
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+    D('Detect').className = 'diag-dot amber';
+    V('Detect').textContent = 'NO FACE';
+    V('Eye').textContent    = '—';
+    D('Eye').className      = 'diag-dot';
+    earFill.style.width     = '0%';
+    earNum.textContent      = '0.000';
+    earDisplay.textContent  = '0.000';
+    earDisplay.className    = 'ear-value';
+    earFill.className       = 'ear-bar-fill';
+
+    if (!noFaceTimer) {
+      const delayMs = parseFloat(noFaceDelayIn.value) * 1000;
+      noFaceTimer = setTimeout(() => {
+        if (detecting) {
+          setAlarmState(true);
+          setMotorBuzzer(false);
+        }
+        noFaceTimer = null;
+      }, delayMs);
+    }
+    return;
+  }
+
+  if (noFaceTimer) { clearTimeout(noFaceTimer); noFaceTimer = null; }
+
+  D('Detect').className   = 'diag-dot cyan';
+  V('Detect').textContent = 'DETECTED';
+
+  const landmarks = results.multiFaceLandmarks[0];
+  const earL = eyeAspectRatio(landmarks, LEFT_EYE);
+  const earR = eyeAspectRatio(landmarks, RIGHT_EYE);
+  const ear  = (earL + earR) / 2;
+
+  const threshold = parseFloat(earThreshIn.value);
+  const pct = Math.min(100, (ear / 0.4) * 100);
+  earFill.style.width = pct + '%';
+  earNum.textContent  = ear.toFixed(3);
+  earDisplay.textContent = ear.toFixed(3);
+
+  const eyesOpen = ear >= threshold;
+  const needed   = Math.round(parseFloat(closeFramesIn.value) * 30);
+
+  if (!eyesOpen) { closedCount++; } else { closedCount = 0; }
+
+  const triggerAlarm = closedCount >= needed;
+
+  if (!eyesOpen) {
+    earFill.className      = 'ear-bar-fill danger';
+    earDisplay.className   = 'ear-value danger';
+  } else {
+    earFill.className      = 'ear-bar-fill';
+    earDisplay.className   = 'ear-value';
+  }
+
+  D('Eye').className   = eyesOpen ? 'diag-dot cyan' : 'diag-dot red';
+  V('Eye').textContent = eyesOpen ? 'OPEN' : 'CLOSED';
+
+  for (const idx of [...LEFT_EYE, ...RIGHT_EYE]) {
+    const lm = landmarks[idx];
+    ctx.beginPath();
+    ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 2.5, 0, 2 * Math.PI);
+    ctx.fillStyle = eyesOpen ? 'rgba(0,227,253,0.85)' : 'rgba(255,23,68,0.85)';
+    ctx.shadowColor = eyesOpen ? '#00E3FD' : '#FF1744';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  setAlarmState(triggerAlarm);
+  setMotorBuzzer(!triggerAlarm);
+});
+
+function setAlarmState(isAlarm) {
+  if (isAlarm) {
+    camPanel.className     = 'cam-panel state-alarm';
+    bigStatus.className    = 'big-status show alarm-state';
+    statusText.textContent = '⚠ DROWSY ALERT';
+    statusIcon.textContent = '⚠';
+    alarmFlash.className   = 'alarm-flash active';
+  } else {
+    camPanel.className     = 'cam-panel state-open';
+    bigStatus.className    = 'big-status show';
+    statusText.textContent = 'EYES OPEN ✓';
+    statusIcon.textContent = '👁';
+    alarmFlash.className   = 'alarm-flash';
+  }
+}
+
+faceMesh.initialize().then(() => {
+  faceMeshReady = true;
+  log('FaceMesh model ready', 'ok');
+  checkReady();
+});
+
+// ── Camera ────────────────────────────────────────────────────
+btnCam.addEventListener('click', async () => {
+  if (camReady) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+    video.srcObject = stream;
+    await new Promise(r => video.onloadedmetadata = r);
+    camReady = true;
+    btnCam.textContent  = '✓ Camera Active';
+    btnCam.classList.add('active');
+    camLabel.textContent = 'LIVE FEED';
+    D('Cam').className  = 'diag-dot cyan';
+    V('Cam').textContent = 'LIVE';
+    log('Camera stream established', 'ok');
+    checkReady();
+  } catch (e) {
+    log('Camera error: ' + e.message, 'err');
+  }
+});
+
+// ── Serial (USB fallback) ─────────────────────────────────────
+btnSerial.addEventListener('click', async () => {
+  if (!('serial' in navigator)) {
+    log('Web Serial not supported — use Chrome/Edge', 'err');
+    alert('Web Serial API not supported!\nPlease use Google Chrome or Microsoft Edge.');
+    return;
+  }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 9600 });
+    serialWriter = serialPort.writable.getWriter();
+    btnSerial.innerHTML = '<span class="material-symbols-outlined">usb</span>✓ USB Linked';
+    btnSerial.classList.add('active');
+    // Only update diag dot if WiFi is not already connected
+    if (!espConnected) {
+      D('Serial').className  = 'diag-dot cyan';
+      V('Serial').textContent = 'USB LINKED';
+    }
+    log('Arduino linked via USB Serial (fallback)', 'ok');
+    checkReady();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') log('Serial error: ' + e.message, 'err');
+  }
+});
+
+// ── Ready check: camera + FaceMesh required to start ─────────
+// WiFi or Serial is optional — detection works without hardware,
+// it just won't trigger the relay/buzzer.
+function checkReady() {
+  btnStart.disabled = !(camReady && faceMeshReady);
+}
+
+const readyInterval = setInterval(() => {
+  if (faceMeshReady && camReady) { checkReady(); clearInterval(readyInterval); }
+}, 500);
+
+// ── Detection loop ────────────────────────────────────────────
+let mpCamera = null;
+
+btnStart.addEventListener('click', () => {
+  if (detecting) {
+    detecting = false;
+    if (mpCamera) { mpCamera.stop(); mpCamera = null; }
+    btnStart.textContent = '◉ Begin Detection';
+    btnStart.classList.remove('running');
+    camPanel.className   = 'cam-panel';
+    bigStatus.className  = 'big-status';
+    alarmFlash.className = 'alarm-flash';
+    log('Detection stopped', 'warn');
+
+    // Turn OFF both motor and buzzer immediately on stop
+    sendWifi('/stop');
+    sendSerial('0');
+    lastSent = '0';
+
+    // Reset UI chips
+    const motorChip  = document.getElementById('motorChip');
+    const buzzerChip = document.getElementById('buzzerChip');
+    const ledMotor   = document.getElementById('ledMotor');
+    const ledBuzzer  = document.getElementById('ledBuzzer');
+    motorChip.className  = 'device-chip';
+    buzzerChip.className = 'device-chip';
+    ledMotor.className   = 'device-led';
+    ledBuzzer.className  = 'device-led';
+    V('Motor').textContent  = 'OFF';
+    V('Motor').className    = 'device-status';
+    V('Buzzer').textContent = 'OFF';
+    V('Buzzer').className   = 'device-status';
+  } else {
+    detecting    = true;
+    closedCount  = 0;
+    lastSent     = null;
+    btnStart.textContent = '◉ Stop Detection';
+    btnStart.classList.add('running');
+    log('Detection started — stay alert!', 'ok');
+
+    // Turn ON motor immediately when detection begins (eyes assumed open at start)
+    sendWifi('/on');
+    sendSerial('1');
+    lastSent = '1';
+
+    // Update UI chips to show running state
+    const motorChip  = document.getElementById('motorChip');
+    const buzzerChip = document.getElementById('buzzerChip');
+    const ledMotor   = document.getElementById('ledMotor');
+    const ledBuzzer  = document.getElementById('ledBuzzer');
+    motorChip.className  = 'device-chip active-green';
+    buzzerChip.className = 'device-chip';
+    ledMotor.className   = 'device-led on-green';
+    ledBuzzer.className  = 'device-led';
+    V('Motor').textContent  = 'RUNNING';
+    V('Motor').className    = 'device-status on';
+    V('Buzzer').textContent = 'OFF';
+    V('Buzzer').className   = 'device-status';
+
+    mpCamera = new Camera(video, {
+      onFrame: async () => { if (detecting) await faceMesh.send({ image: video }); },
+      width: 1280, height: 720
+    });
+    mpCamera.start();
+  }
+});
+</script>
+</body>
+</html>
