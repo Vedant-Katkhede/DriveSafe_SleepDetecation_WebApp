@@ -248,7 +248,7 @@ header {
 main {
   padding-top: 80px;
   padding-bottom: 32px;
-  padding-left: 88px;
+  padding-left: 24px;
   padding-right: 24px;
   min-height: 100vh;
   display: grid;
@@ -1057,27 +1057,7 @@ footer {
 </header>
 
 <!-- ── SIDE NAV ── -->
-<nav class="sidenav">
-  <div class="nav-item active">
-    <span class="material-symbols-outlined">speed</span>
-    <span class="nav-label">Dashboard</span>
-  </div>
-  <div class="nav-item">
-    <span class="material-symbols-outlined">analytics</span>
-    <span class="nav-label">Telemetry</span>
-  </div>
-  <div class="nav-item">
-    <span class="material-symbols-outlined">tune</span>
-    <span class="nav-label">Calibrate</span>
-  </div>
-  <div class="nav-item">
-    <span class="material-symbols-outlined">settings</span>
-    <span class="nav-label">Settings</span>
-  </div>
-  <div class="nav-emergency" title="Emergency Stop">
-    <span class="material-symbols-outlined" style="font-size:22px;">emergency_home</span>
-  </div>
-</nav>
+
 
 <!-- ── MAIN CONTENT ── -->
 <main>
@@ -1402,6 +1382,8 @@ function sendCommand(eyesOpen) {
 }
 
 // ── Update UI chips/LEDs for motor & buzzer ───────────────────
+let lastMotorBuzzerState = null; // track UI state to avoid log spam
+
 function setMotorBuzzer(eyesOpen) {
   sendCommand(eyesOpen);
 
@@ -1419,7 +1401,10 @@ function setMotorBuzzer(eyesOpen) {
     V('Motor').className    = 'device-status on';
     V('Buzzer').textContent = 'OFF';
     V('Buzzer').className   = 'device-status';
-    log('Eyes OPEN → Motor ON, Buzzer OFF', 'ok');
+    if (lastMotorBuzzerState !== 'open') {
+      log('Eyes OPEN → Motor ON, Buzzer OFF', 'ok');
+      lastMotorBuzzerState = 'open';
+    }
   } else {
     motorChip.className  = 'device-chip';
     buzzerChip.className = 'device-chip active-red';
@@ -1429,7 +1414,10 @@ function setMotorBuzzer(eyesOpen) {
     V('Motor').className    = 'device-status';
     V('Buzzer').textContent = 'ALARM!';
     V('Buzzer').className   = 'device-status alarm';
-    log('Eyes CLOSED → Motor OFF, Buzzer ALARM', 'err');
+    if (lastMotorBuzzerState !== 'closed') {
+      log('Eyes CLOSED → Motor OFF, Buzzer ALARM', 'err');
+      lastMotorBuzzerState = 'closed';
+    }
   }
 }
 
@@ -1716,6 +1704,7 @@ btnStart.addEventListener('click', () => {
     camPanel.className   = 'cam-panel';
     bigStatus.className  = 'big-status';
     alarmFlash.className = 'alarm-flash';
+    lastMotorBuzzerState = null;
     log('Detection stopped', 'warn');
 
     // Turn OFF both motor and buzzer immediately on stop
