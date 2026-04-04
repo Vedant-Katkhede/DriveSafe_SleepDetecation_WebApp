@@ -1211,7 +1211,7 @@ footer {
           ESP8266 WiFi Link
         </div>
         <div class="esp-input-row">
-          <span id="espIpDisplay" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--primary);padding:8px 12px;background:var(--surface-low);border-radius:8px;border:1px solid rgba(255,179,0,0.2);flex:1;">172.26.241.129</span>
+          <input id="espIpInput" type="text" placeholder="e.g. 192.168.1.105" spellcheck="false" autocomplete="off" />
           <button id="btnWifi">Connect</button>
         </div>
         <div class="esp-status-row">
@@ -1299,10 +1299,13 @@ const closeFramesIn = document.getElementById('closeFrames');
 const noFaceDelayIn = document.getElementById('noFaceDelay');
 
 // ── ESP WiFi refs ─────────────────────────────────────────────
-const HARDCODED_IP = '172.26.241.129';   // Fixed ESP IP — never changes
 const btnWifi      = document.getElementById('btnWifi');
 const espStatusDot = document.getElementById('espStatusDot');
 const espStatusTxt = document.getElementById('espStatusText');
+const espIpInput   = document.getElementById('espIpInput');
+
+// Restore saved IP from last session
+espIpInput.value = localStorage.getItem('esp_ip') || '';
 
 // ── Dot / Val helpers ─────────────────────────────────────────
 const D = k => document.getElementById('dot' + k);
@@ -1336,7 +1339,7 @@ let noFaceTimer   = null;
 let faceMeshReady = false;
 
 // ── ESP WiFi State ────────────────────────────────────────────
-let espIp        = HARDCODED_IP;   // Always use the fixed IP
+let espIp        = '';             // Set dynamically from the IP input field
 let espConnected = false;          // true after successful /status ping
 
 // ── Logger ────────────────────────────────────────────────────
@@ -1432,29 +1435,42 @@ function setMotorBuzzer(eyesOpen) {
 
 // ── ESP WiFi Connect / Disconnect ────────────────────────────
 async function connectToEsp() {
+  const inputIp = espIpInput.value.trim();
+
+  if (!inputIp) {
+    espStatusDot.className   = 'error';
+    espStatusTxt.textContent = 'Enter the ESP IP address first';
+    log('No IP entered — type your ESP IP and press Connect', 'err');
+    return;
+  }
+
+  espIp = inputIp;
+  localStorage.setItem('esp_ip', espIp);   // Remember for next session
+
   espStatusTxt.textContent = 'Pinging ESP...';
   espStatusDot.className   = '';
   btnWifi.textContent      = 'Connecting...';
   btnWifi.disabled         = true;
+  espIpInput.disabled      = true;
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(`http://${HARDCODED_IP}/status`, { signal: controller.signal });
+    const res = await fetch(`http://${espIp}/status`, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (res.ok) {
       espConnected = true;
 
       espStatusDot.className   = 'connected';
-      espStatusTxt.textContent = `Connected — ${HARDCODED_IP}`;
+      espStatusTxt.textContent = `Connected — ${espIp}`;
       btnWifi.textContent      = '✗ Disconnect';
       btnWifi.classList.add('active');
 
       D('Serial').className    = 'diag-dot cyan';
       V('Serial').textContent  = 'WIFI LINKED';
 
-      log(`ESP linked via WiFi at ${HARDCODED_IP}`, 'ok');
+      log(`ESP linked via WiFi at ${espIp}`, 'ok');
       log('Ready — press Begin Detection to start motor & monitoring', 'warn');
       checkReady();
     } else {
@@ -1465,6 +1481,7 @@ async function connectToEsp() {
     espStatusDot.className   = 'error';
     espStatusTxt.textContent = 'Failed — check IP & same network';
     btnWifi.textContent      = 'Retry';
+    espIpInput.disabled      = false;
     log('WiFi connect failed: ' + (e.name === 'AbortError' ? 'timeout' : e.message), 'err');
   }
 
@@ -1480,6 +1497,7 @@ async function disconnectFromEsp() {
   espStatusTxt.textContent = 'Disconnected';
   btnWifi.textContent      = 'Connect';
   btnWifi.classList.remove('active');
+  espIpInput.disabled      = false;   // Allow editing the IP again
 
   D('Serial').className    = 'diag-dot';
   V('Serial').textContent  = 'NOT LINKED';
@@ -1507,9 +1525,13 @@ btnWifi.addEventListener('click', () => {
   }
 });
 
-// Auto-connect on page load
+// Auto-connect on page load only if a saved IP exists
 window.addEventListener('load', () => {
-  connectToEsp();
+  if (espIpInput.value) {
+    connectToEsp();
+  } else {
+    espStatusTxt.textContent = 'Enter your ESP IP to connect';
+  }
 });
 
 // ── FaceMesh ──────────────────────────────────────────────────
